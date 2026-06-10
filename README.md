@@ -19,14 +19,25 @@ Paper Forge is a modular macOS document productivity app — a native SwiftUI ap
 | Flatten PDF | PDF | PDF | ✅ Shipped |
 | Edit PDF | PDF | PDF | ✅ Shipped |
 
-### Planned (Phase 3)
-- Translate PDF — requires AI/translation service integration
+| Translate PDF | PDF | PDF | ✅ Shipped |
+
+## Installation
+
+1. Download `Paper Forge-0.1.0.dmg` from [Releases](../../releases)
+2. Open the DMG and drag **Paper Forge** to your Applications folder
+3. The first time you open it, macOS will show a security warning because the app is not from the App Store
+4. **To open it anyway:** right-click (or Control-click) the app icon → **Open** → click **Open** in the dialog
+
+You only need to do this once. After that it opens normally.
+
+> **Why the warning?** Apple requires a $99/year developer account for full notarization. Paper Forge is distributed free and open source — the app is safe, the warning is just Apple's policy.
 
 ## Stack
 
 - **UI:** SwiftUI (macOS 14+)
 - **Core:** Swift — PDFKit, CoreGraphics, CoreText, AppKit
 - **Output formats:** Native OOXML (docx/pptx/xlsx) packaged via `/usr/bin/zip` — no third-party dependencies
+- **Translation:** Apple `Translation.framework` — free, on-device, 19 languages, no API key (requires macOS 15+)
 - **Distribution:** Ad-hoc or Developer-ID signed `.app` in a `.dmg`
 
 ## Build

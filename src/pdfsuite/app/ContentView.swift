@@ -339,6 +339,7 @@ private struct FeatureOptionsSection: View {
         case "pdf_to_pptx":   PDFToPPTXOptionsView()
         case "pdf_to_excel":  PDFToExcelOptionsView()
         case "edit_pdf":      EditPDFOptionsView()
+        case "translate_pdf": TranslatePDFOptionsView()
         default:              EmptyView()
         }
     }
@@ -449,6 +450,49 @@ private struct PDFToWordOptionsView: View {
         OptionsCard(title: "Word Options") {
             Toggle("Insert page break between PDF pages", isOn: $appState.wordPageBreaks)
                 .font(.system(size: 13))
+        }
+    }
+}
+
+private struct TranslatePDFOptionsView: View {
+    @EnvironmentObject private var appState: AppState
+
+    private let sourceLangs: [TranslationLanguage] = [.autoDetect] + TranslationLanguage.all
+    private let targetLangs: [TranslationLanguage] = TranslationLanguage.all
+
+    var body: some View {
+        OptionsCard(title: "Translation") {
+            HStack(spacing: 0) {
+                Text("From")
+                    .font(.system(size: 13))
+                    .frame(width: 60, alignment: .leading)
+                Picker("", selection: $appState.translateSourceLangID) {
+                    ForEach(sourceLangs) { lang in
+                        Text(lang.displayName).tag(lang.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+            Divider()
+            HStack(spacing: 0) {
+                Text("To")
+                    .font(.system(size: 13))
+                    .frame(width: 60, alignment: .leading)
+                Picker("", selection: $appState.translateTargetLangID) {
+                    ForEach(targetLangs) { lang in
+                        Text(lang.displayName).tag(lang.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+            if #unavailable(macOS 26.0) {
+                Divider()
+                Label("Requires macOS 15 or later", systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
         }
     }
 }
@@ -798,6 +842,7 @@ private extension ModuleManifest {
         case "pink":   return .pink
         case "teal":   return .teal
         case "purple": return .purple
+        case "mint":   return .mint
         default:       return .accentColor
         }
     }

@@ -71,6 +71,15 @@ final class BuiltInModuleRegistry: ModuleRegistering {
                 iconName: "pencil.and.scribble",
                 colorName: "purple",
                 moduleDescription: "Remove or rotate pages with simple non-destructive edits"
+            ),
+            ModuleManifest(
+                id: "translate_pdf",
+                displayName: "Translate PDF",
+                category: "Convert",
+                supportedInputTypes: ["pdf"],
+                iconName: "character.bubble",
+                colorName: "mint",
+                moduleDescription: "Translate PDF text into another language using Apple on-device AI"
             )
         ]
     }
@@ -106,6 +115,10 @@ final class BuiltInModuleRegistry: ModuleRegistering {
             let op = EditPDFOperation(rawValue: settings["operation"] ?? "") ?? .removeBlankPages
             let rot = Int(settings["rotationDegrees"] ?? "") ?? 90
             return EditPDFModule(options: EditPDFOptions(operation: op, rotationDegrees: rot))
+        case "translate_pdf":
+            let src = settings["sourceLanguageID"] ?? ""
+            let tgt = settings["targetLanguageID"] ?? "es"
+            return TranslatePDFModule(options: TranslatePDFOptions(sourceLanguageID: src, targetLanguageID: tgt))
         default:
             return nil
         }

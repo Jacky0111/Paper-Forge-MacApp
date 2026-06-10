@@ -37,6 +37,7 @@ swift_sources=(
   "$SRC/modules/pdf_to_ppt_pptx/PDFToPPTXModule.swift"
   "$SRC/modules/pdf_to_excel_csv/PDFToExcelModule.swift"
   "$SRC/modules/edit_pdf/EditPDFModule.swift"
+  "$SRC/modules/translate_pdf/TranslatePDFModule.swift"
   "$SRC/app/AppContainer.swift"
   "$SRC/app/AppState.swift"
   "$SRC/app/ContentView.swift"

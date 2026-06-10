@@ -39,6 +39,8 @@ final class AppState: ObservableObject {
     @Published var excelAllPages: Bool = true
     @Published var editPDFOperation: EditPDFOperation = .removeBlankPages
     @Published var editPDFRotation: Int = 90
+    @Published var translateSourceLangID: String = ""
+    @Published var translateTargetLangID: String = "es"
     @Published var jobs: [DocumentJob] = []
     @Published var cancellationRequested: Bool = false
     private var currentCancellationToken: CancellationToken?
@@ -222,6 +224,8 @@ final class AppState: ObservableObject {
             return ["format": excelFormat.rawValue, "allPages": excelAllPages ? "true" : "false"]
         case "edit_pdf":
             return ["operation": editPDFOperation.rawValue, "rotationDegrees": String(editPDFRotation)]
+        case "translate_pdf":
+            return ["sourceLanguageID": translateSourceLangID, "targetLanguageID": translateTargetLangID]
         default:
             return [:]
         }
@@ -272,6 +276,12 @@ final class AppState: ObservableObject {
            let parsedRot = Int(rot) {
             editPDFRotation = parsedRot
         }
+        if let src = container.settingsStore.value(forKey: "translateSourceLangID") {
+            translateSourceLangID = src
+        }
+        if let tgt = container.settingsStore.value(forKey: "translateTargetLangID") {
+            translateTargetLangID = tgt
+        }
     }
 
     private func saveSettings() {
@@ -287,6 +297,8 @@ final class AppState: ObservableObject {
         container.settingsStore.setValue(excelAllPages ? "true" : "false", forKey: "excelAllPages")
         container.settingsStore.setValue(editPDFOperation.rawValue, forKey: "editPDFOperation")
         container.settingsStore.setValue(String(editPDFRotation), forKey: "editPDFRotation")
+        container.settingsStore.setValue(translateSourceLangID, forKey: "translateSourceLangID")
+        container.settingsStore.setValue(translateTargetLangID, forKey: "translateTargetLangID")
     }
 
     private func inputContentTypes() -> [UTType] {
