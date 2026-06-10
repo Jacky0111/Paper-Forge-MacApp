@@ -23,7 +23,7 @@ Paper Forge is a modular macOS document productivity app — a native SwiftUI ap
 
 ## Installation
 
-1. Download `Paper Forge-0.1.0.dmg` from [Releases](../../releases)
+1. Download `Paper Forge-0.2.0.dmg` from [Releases](../../releases)
 2. Open the DMG and drag **Paper Forge** to your Applications folder
 3. The first time you open it, macOS will show a security warning because the app is not from the App Store
 4. **To open it anyway:** right-click (or Control-click) the app icon → **Open** → click **Open** in the dialog
