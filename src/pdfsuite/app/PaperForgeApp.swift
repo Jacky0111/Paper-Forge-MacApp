@@ -8,6 +8,11 @@ struct PaperForgeApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(appState)
+                .frame(minWidth: 800, minHeight: 540)
+        }
+        .defaultSize(width: 960, height: 660)
+        .commands {
+            CommandGroup(replacing: .newItem) { }
         }
     }
 }

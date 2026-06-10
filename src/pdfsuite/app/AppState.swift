@@ -1,21 +1,44 @@
 import AppKit
 import UniformTypeIdentifiers
+import UserNotifications
 import SwiftUI
 
 @MainActor
 final class AppState: ObservableObject {
     let container: AppContainer
-    @Published var selectedModuleID: String = "pdf_to_images"
+    @Published var selectedModuleID: String = "pdf_to_images" {
+        didSet {
+            guard oldValue != selectedModuleID else { return }
+            if let url = inputURL {
+                let ext = url.pathExtension.lowercased()
+                let newManifest = moduleManifests.first { $0.id == selectedModuleID }
+                if newManifest?.supportedInputTypes.contains(ext) != true {
+                    inputURL = nil
+                }
+            }
+            lastReport = nil
+            currentProgress = 0
+            statusMessage = "Drop a file or click Choose File to get started."
+        }
+    }
     @Published var inputURL: URL?
     @Published var outputDirectory: URL?
-    @Published var statusMessage: String = "Choose a feature, input file, and output folder."
+    @Published var statusMessage: String = "Drop a file or click Choose File to get started."
     @Published var isRunning: Bool = false
+    @Published var currentProgress: Double = 0
     @Published var lastReport: ModuleExecutionReport?
     @Published var pdfImageFormat: PDFImageFormat = .png
     @Published var pdfImageDPI: Int = 200
     @Published var txtFontSize: Double = 12
     @Published var txtMargin: Double = 48
     @Published var flattenPreserveAnnotations: Bool = false
+    @Published var wordPageBreaks: Bool = true
+    @Published var pptxIncludeImages: Bool = true
+    @Published var pptxSlideSize: PDFToPPTXOptions.SlideSize = .widescreen
+    @Published var excelFormat: ExcelOutputFormat = .csv
+    @Published var excelAllPages: Bool = true
+    @Published var editPDFOperation: EditPDFOperation = .removeBlankPages
+    @Published var editPDFRotation: Int = 90
     @Published var jobs: [DocumentJob] = []
     @Published var cancellationRequested: Bool = false
     private var currentCancellationToken: CancellationToken?
@@ -24,6 +47,7 @@ final class AppState: ObservableObject {
         self.container = container
         loadSettings()
         jobs = container.jobStore.allJobs()
+        requestNotificationPermission()
     }
 
     var moduleManifests: [ModuleManifest] {
@@ -32,6 +56,37 @@ final class AppState: ObservableObject {
 
     var selectedModule: ModuleManifest? {
         moduleManifests.first { $0.id == selectedModuleID }
+    }
+
+    var runButtonHelp: String {
+        if isRunning { return "A conversion is already in progress." }
+        if inputURL == nil { return "Choose an input file first." }
+        if outputDirectory == nil { return "Choose an output folder first." }
+        return "Start the conversion"
+    }
+
+    func setInput(url: URL) {
+        guard let manifest = selectedModule else { return }
+        let ext = url.pathExtension.lowercased()
+        guard manifest.supportedInputTypes.contains(ext) else {
+            statusMessage = "This file type (\(ext.uppercased())) is not supported by \(manifest.displayName)."
+            return
+        }
+        inputURL = url
+        lastReport = nil
+        statusMessage = "Ready — \(url.lastPathComponent)"
+        if outputDirectory == nil {
+            outputDirectory = url.deletingLastPathComponent().appendingPathComponent(
+                "\(url.deletingPathExtension().lastPathComponent)_output",
+                isDirectory: true
+            )
+        }
+    }
+
+    func clearInput() {
+        inputURL = nil
+        lastReport = nil
+        statusMessage = "Drop a file or click Choose File to get started."
     }
 
     func runSelectedModule() {
@@ -49,6 +104,7 @@ final class AppState: ObservableObject {
         saveSettings()
         cancellationRequested = false
         isRunning = true
+        currentProgress = 0
         statusMessage = "Running \(selectedModule?.displayName ?? "feature")..."
         lastReport = nil
         let cancellationToken = CancellationToken()
@@ -59,7 +115,7 @@ final class AppState: ObservableObject {
             sourceURL: inputURL,
             outputURL: outputDirectory,
             status: .running,
-            progress: 0.1,
+            progress: 0.05,
             message: statusMessage
         )
         container.jobStore.enqueue(job)
@@ -69,6 +125,7 @@ final class AppState: ObservableObject {
         )
 
         let moduleRunner = container.moduleRunner
+        let moduleName = selectedModule?.displayName ?? selectedModuleID
         Task.detached(priority: .userInitiated) { [weak self] in
             do {
                 let report = try moduleRunner.run(
@@ -93,7 +150,7 @@ final class AppState: ObservableObject {
                 )
 
                 await MainActor.run { [weak self] in
-                    self?.finishJob(jobID: job.id, report: report)
+                    self?.finishJob(jobID: job.id, report: report, moduleName: moduleName)
                 }
             } catch {
                 await MainActor.run { [weak self] in
@@ -106,7 +163,7 @@ final class AppState: ObservableObject {
     func cancelCurrentJob() {
         cancellationRequested = true
         currentCancellationToken?.cancel()
-        statusMessage = "Cancellation requested."
+        statusMessage = "Cancellation requested..."
     }
 
     func openOutputFolder() {
@@ -114,7 +171,6 @@ final class AppState: ObservableObject {
             statusMessage = "Choose an output folder first."
             return
         }
-
         NSWorkspace.shared.open(outputDirectory)
     }
 
@@ -128,14 +184,7 @@ final class AppState: ObservableObject {
         panel.title = "Choose Input File"
 
         if panel.runModal() == .OK, let selectedURL = panel.url {
-            inputURL = selectedURL
-            statusMessage = "Input selected."
-            if outputDirectory == nil {
-                outputDirectory = selectedURL.deletingLastPathComponent().appendingPathComponent(
-                    "\(selectedURL.deletingPathExtension().lastPathComponent)_output",
-                    isDirectory: true
-                )
-            }
+            setInput(url: selectedURL)
         }
     }
 
@@ -146,6 +195,9 @@ final class AppState: ObservableObject {
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.title = "Choose Output Folder"
+        if let current = outputDirectory {
+            panel.directoryURL = current.deletingLastPathComponent()
+        }
 
         if panel.runModal() == .OK, let selectedURL = panel.url {
             outputDirectory = selectedURL
@@ -156,19 +208,20 @@ final class AppState: ObservableObject {
     private func settingsForSelectedModule() -> [String: String] {
         switch selectedModuleID {
         case "pdf_to_images":
-            return [
-                "dpi": String(pdfImageDPI),
-                "format": pdfImageFormat.rawValue
-            ]
+            return ["dpi": String(pdfImageDPI), "format": pdfImageFormat.rawValue]
         case "txt_to_pdf":
-            return [
-                "fontSize": String(txtFontSize),
-                "margin": String(txtMargin)
-            ]
+            return ["fontSize": String(txtFontSize), "margin": String(txtMargin)]
         case "flatten_pdf":
-            return [
-                "preserveAnnotations": flattenPreserveAnnotations ? "true" : "false"
-            ]
+            return ["preserveAnnotations": flattenPreserveAnnotations ? "true" : "false"]
+        case "pdf_to_word":
+            return ["pageBreaks": wordPageBreaks ? "true" : "false"]
+        case "pdf_to_pptx":
+            return ["includeImages": pptxIncludeImages ? "true" : "false",
+                    "slideSize": pptxSlideSize.rawValue]
+        case "pdf_to_excel":
+            return ["format": excelFormat.rawValue, "allPages": excelAllPages ? "true" : "false"]
+        case "edit_pdf":
+            return ["operation": editPDFOperation.rawValue, "rotationDegrees": String(editPDFRotation)]
         default:
             return [:]
         }
@@ -179,24 +232,45 @@ final class AppState: ObservableObject {
            let parsedFormat = PDFImageFormat(rawValue: format) {
             pdfImageFormat = parsedFormat
         }
-
         if let dpi = container.settingsStore.value(forKey: "pdfImageDPI"),
            let parsedDPI = Int(dpi) {
             pdfImageDPI = parsedDPI
         }
-
         if let fontSize = container.settingsStore.value(forKey: "txtFontSize"),
            let parsedFontSize = Double(fontSize) {
             txtFontSize = parsedFontSize
         }
-
         if let margin = container.settingsStore.value(forKey: "txtMargin"),
            let parsedMargin = Double(margin) {
             txtMargin = parsedMargin
         }
-
         if let preserve = container.settingsStore.value(forKey: "flattenPreserveAnnotations") {
             flattenPreserveAnnotations = preserve == "true"
+        }
+        if let pageBreaks = container.settingsStore.value(forKey: "wordPageBreaks") {
+            wordPageBreaks = pageBreaks != "false"
+        }
+        if let includeImages = container.settingsStore.value(forKey: "pptxIncludeImages") {
+            pptxIncludeImages = includeImages != "false"
+        }
+        if let sizeRaw = container.settingsStore.value(forKey: "pptxSlideSize"),
+           let size = PDFToPPTXOptions.SlideSize(rawValue: sizeRaw) {
+            pptxSlideSize = size
+        }
+        if let fmt = container.settingsStore.value(forKey: "excelFormat"),
+           let parsedFmt = ExcelOutputFormat(rawValue: fmt) {
+            excelFormat = parsedFmt
+        }
+        if let allPages = container.settingsStore.value(forKey: "excelAllPages") {
+            excelAllPages = allPages != "false"
+        }
+        if let op = container.settingsStore.value(forKey: "editPDFOperation"),
+           let parsedOp = EditPDFOperation(rawValue: op) {
+            editPDFOperation = parsedOp
+        }
+        if let rot = container.settingsStore.value(forKey: "editPDFRotation"),
+           let parsedRot = Int(rot) {
+            editPDFRotation = parsedRot
         }
     }
 
@@ -206,6 +280,13 @@ final class AppState: ObservableObject {
         container.settingsStore.setValue(String(txtFontSize), forKey: "txtFontSize")
         container.settingsStore.setValue(String(txtMargin), forKey: "txtMargin")
         container.settingsStore.setValue(flattenPreserveAnnotations ? "true" : "false", forKey: "flattenPreserveAnnotations")
+        container.settingsStore.setValue(wordPageBreaks ? "true" : "false", forKey: "wordPageBreaks")
+        container.settingsStore.setValue(pptxIncludeImages ? "true" : "false", forKey: "pptxIncludeImages")
+        container.settingsStore.setValue(pptxSlideSize.rawValue, forKey: "pptxSlideSize")
+        container.settingsStore.setValue(excelFormat.rawValue, forKey: "excelFormat")
+        container.settingsStore.setValue(excelAllPages ? "true" : "false", forKey: "excelAllPages")
+        container.settingsStore.setValue(editPDFOperation.rawValue, forKey: "editPDFOperation")
+        container.settingsStore.setValue(String(editPDFRotation), forKey: "editPDFRotation")
     }
 
     private func inputContentTypes() -> [UTType] {
@@ -227,6 +308,7 @@ final class AppState: ObservableObject {
         job.message = message
         job.resultURLs = resultURLs
         statusMessage = message
+        currentProgress = progress
         container.jobStore.update(job)
         jobs = container.jobStore.allJobs()
         container.progressBus.publish(
@@ -234,7 +316,7 @@ final class AppState: ObservableObject {
         )
     }
 
-    private func finishJob(jobID: UUID, report: ModuleExecutionReport) {
+    private func finishJob(jobID: UUID, report: ModuleExecutionReport, moduleName: String) {
         lastReport = report
         updateJob(
             id: jobID,
@@ -246,18 +328,32 @@ final class AppState: ObservableObject {
         currentCancellationToken = nil
         cancellationRequested = false
         isRunning = false
+        sendCompletionNotification(moduleName: moduleName, summary: report.summary)
     }
 
     private func failJob(jobID: UUID, error: Error, wasCancelled: Bool) {
-        let message = error.localizedDescription
+        let message = wasCancelled ? "Cancelled." : error.localizedDescription
         updateJob(
             id: jobID,
             status: wasCancelled ? .cancelled : .failed,
-            progress: 1,
+            progress: 0,
             message: message,
             resultURLs: []
         )
         currentCancellationToken = nil
         isRunning = false
+    }
+
+    private func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    private func sendCompletionNotification(moduleName: String, summary: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "\(moduleName) Complete"
+        content.body = summary
+        content.sound = .default
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request)
     }
 }

@@ -12,7 +12,10 @@ final class FlattenPDFModule: ModulePerforming {
         id: "flatten_pdf",
         displayName: "Flatten PDF",
         category: "Optimize",
-        supportedInputTypes: ["pdf"]
+        supportedInputTypes: ["pdf"],
+        iconName: "arrow.2.squarepath",
+        colorName: "orange",
+        moduleDescription: "Merge annotations and form fields into the page"
     )
 
     private let options: FlattenPDFOptions
@@ -49,6 +52,11 @@ final class FlattenPDFRenderer {
             throw DocumentError.invalidInput("Unable to open the selected PDF.")
         }
 
+        let pageCount = document.pageCount
+        guard pageCount > 0 else {
+            throw DocumentError.processingFailed("The selected PDF does not contain any pages.")
+        }
+
         let fileManager = FileManager.default
         try fileManager.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
 
@@ -64,28 +72,22 @@ final class FlattenPDFRenderer {
             throw DocumentError.processingFailed("Unable to create the flattened PDF drawing context.")
         }
 
-        let pageCount = document.pageCount
         context.reportProgress(0.05, "Preparing flattened PDF...")
-        for index in 0..<document.pageCount {
+        for index in 0..<pageCount {
             try context.checkCancellation()
             guard let page = document.page(at: index) else { continue }
             let pageNumber = index + 1
-            context.reportProgress(Double(index) / Double(max(pageCount, 1)), "Flattening page \(pageNumber) of \(pageCount)...")
+            context.reportProgress(Double(index) / Double(pageCount), "Flattening page \(pageNumber) of \(pageCount)...")
             let pageBounds = page.bounds(for: .mediaBox)
             var mediaBox = CGRect(origin: .zero, size: pageBounds.size)
 
             pdfContext.beginPDFPage([kCGPDFContextMediaBox as String: NSData(bytes: &mediaBox, length: MemoryLayout<CGRect>.size)] as CFDictionary)
             draw(page: page, pageBounds: pageBounds, options: options, in: pdfContext)
             pdfContext.endPDFPage()
-            context.reportProgress(Double(pageNumber) / Double(max(pageCount, 1)), "Flattened page \(pageNumber) of \(pageCount).")
+            context.reportProgress(Double(pageNumber) / Double(pageCount), "Flattened page \(pageNumber) of \(pageCount).")
         }
 
         pdfContext.closePDF()
-
-        guard document.pageCount > 0 else {
-            throw DocumentError.processingFailed("The selected PDF does not contain any pages.")
-        }
-
         context.reportProgress(1, "Created flattened PDF from \(pdfURL.lastPathComponent).")
         return outputURL
     }

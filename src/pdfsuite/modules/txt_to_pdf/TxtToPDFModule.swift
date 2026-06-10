@@ -14,7 +14,10 @@ final class TxtToPDFModule: ModulePerforming {
         id: "txt_to_pdf",
         displayName: "TXT to PDF",
         category: "Convert",
-        supportedInputTypes: ["txt"]
+        supportedInputTypes: ["txt"],
+        iconName: "doc.text",
+        colorName: "green",
+        moduleDescription: "Convert plain text into a clean PDF"
     )
 
     private let options: TxtToPDFOptions
@@ -89,7 +92,8 @@ final class TxtToPDFRenderer {
         repeat {
             try context.checkCancellation()
             pageNumber += 1
-            context.reportProgress(0.25, "Writing page \(pageNumber)...")
+            let startProgress = 0.25 + (Double(currentRange.location) / Double(max(attributedText.length, 1))) * 0.7
+            context.reportProgress(startProgress, "Writing page \(pageNumber)...")
             pdfContext.beginPDFPage(nil)
             drawPageText(
                 framesetter: framesetter,

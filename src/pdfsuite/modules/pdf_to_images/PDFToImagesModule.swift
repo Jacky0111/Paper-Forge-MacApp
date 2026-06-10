@@ -23,7 +23,10 @@ final class PDFToImagesModule: ModulePerforming {
         id: "pdf_to_images",
         displayName: "PDF to Images",
         category: "Convert",
-        supportedInputTypes: ["pdf"]
+        supportedInputTypes: ["pdf"],
+        iconName: "photo.stack",
+        colorName: "blue",
+        moduleDescription: "Export each page as PNG, JPG, or TIFF"
     )
 
     private let options: PDFToImagesOptions
@@ -101,7 +104,10 @@ final class PDFToImagesRenderer {
             NSGraphicsContext.current = graphicsContext
             graphicsContext.cgContext.setFillColor(NSColor.white.cgColor)
             graphicsContext.cgContext.fill(CGRect(origin: .zero, size: targetSize))
-            graphicsContext.cgContext.scaleBy(x: scale, y: scale)
+            // NSBitmapImageRep stores rows from bottom (CoreGraphics) but PNG/JPEG encode
+            // rows from the top, producing a vertical flip without this correction.
+            graphicsContext.cgContext.translateBy(x: 0, y: targetSize.height)
+            graphicsContext.cgContext.scaleBy(x: scale, y: -scale)
             page.draw(with: .mediaBox, to: graphicsContext.cgContext)
             NSGraphicsContext.restoreGraphicsState()
 

@@ -5,4 +5,7 @@ struct ModuleManifest: Identifiable, Hashable {
     let displayName: String
     let category: String
     let supportedInputTypes: [String]
+    let iconName: String
+    let colorName: String
+    let moduleDescription: String
 }

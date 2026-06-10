@@ -13,19 +13,64 @@ final class BuiltInModuleRegistry: ModuleRegistering {
                 id: "pdf_to_images",
                 displayName: "PDF to Images",
                 category: "Convert",
-                supportedInputTypes: ["pdf"]
+                supportedInputTypes: ["pdf"],
+                iconName: "photo.stack",
+                colorName: "blue",
+                moduleDescription: "Export each page as PNG, JPG, or TIFF"
             ),
             ModuleManifest(
                 id: "txt_to_pdf",
                 displayName: "TXT to PDF",
                 category: "Convert",
-                supportedInputTypes: ["txt"]
+                supportedInputTypes: ["txt"],
+                iconName: "doc.text",
+                colorName: "green",
+                moduleDescription: "Convert plain text into a clean PDF"
             ),
             ModuleManifest(
                 id: "flatten_pdf",
                 displayName: "Flatten PDF",
                 category: "Optimize",
-                supportedInputTypes: ["pdf"]
+                supportedInputTypes: ["pdf"],
+                iconName: "arrow.2.squarepath",
+                colorName: "orange",
+                moduleDescription: "Merge annotations and form fields into the page"
+            ),
+            ModuleManifest(
+                id: "pdf_to_word",
+                displayName: "PDF to Word",
+                category: "Convert",
+                supportedInputTypes: ["pdf"],
+                iconName: "doc.richtext",
+                colorName: "indigo",
+                moduleDescription: "Extract text and styles into an editable .docx file"
+            ),
+            ModuleManifest(
+                id: "pdf_to_pptx",
+                displayName: "PDF to PPTX",
+                category: "Convert",
+                supportedInputTypes: ["pdf"],
+                iconName: "play.rectangle",
+                colorName: "pink",
+                moduleDescription: "Convert each PDF page into a PowerPoint slide"
+            ),
+            ModuleManifest(
+                id: "pdf_to_excel",
+                displayName: "PDF to Excel",
+                category: "Convert",
+                supportedInputTypes: ["pdf"],
+                iconName: "tablecells",
+                colorName: "teal",
+                moduleDescription: "Extract tables and text into CSV or XLSX spreadsheet"
+            ),
+            ModuleManifest(
+                id: "edit_pdf",
+                displayName: "Edit PDF",
+                category: "Optimize",
+                supportedInputTypes: ["pdf"],
+                iconName: "pencil.and.scribble",
+                colorName: "purple",
+                moduleDescription: "Remove or rotate pages with simple non-destructive edits"
             )
         ]
     }
@@ -43,6 +88,24 @@ final class BuiltInModuleRegistry: ModuleRegistering {
         case "flatten_pdf":
             let preserveAnnotations = settings["preserveAnnotations"] == "true"
             return FlattenPDFModule(options: FlattenPDFOptions(preserveAnnotations: preserveAnnotations))
+        case "pdf_to_word":
+            let pageBreaks = settings["pageBreaks"] != "false"
+            return PDFToWordModule(options: PDFToWordOptions(pageBreaks: pageBreaks))
+        case "pdf_to_pptx":
+            let includeImages = settings["includeImages"] != "false"
+            let sizeRaw = settings["slideSize"] ?? "widescreen"
+            let slideSize = PDFToPPTXOptions.SlideSize(rawValue: sizeRaw) ?? .widescreen
+            return PDFToPPTXModule(options: PDFToPPTXOptions(includeImages: includeImages, slideSize: slideSize))
+        case "pdf_to_excel":
+            let format = ExcelOutputFormat(rawValue: settings["format"] ?? "") ?? .csv
+            let allPages = settings["allPages"] != "false"
+            return PDFToExcelModule(options: PDFToExcelOptions(
+                format: format, allPages: allPages, rowThreshold: 3.0, colGapThreshold: 12.0
+            ))
+        case "edit_pdf":
+            let op = EditPDFOperation(rawValue: settings["operation"] ?? "") ?? .removeBlankPages
+            let rot = Int(settings["rotationDegrees"] ?? "") ?? 90
+            return EditPDFModule(options: EditPDFOptions(operation: op, rotationDegrees: rot))
         default:
             return nil
         }
